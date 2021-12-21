@@ -4,6 +4,12 @@
 // Re-export pallet items so that they can be accessed from the crate namespace.
 pub use pallet::*;
 
+#[cfg(test)]
+mod mock;
+
+#[cfg(test)]
+mod tests;
+
 #[frame_support::pallet]
 pub mod pallet {
     use frame_support::pallet_prelude::*;
