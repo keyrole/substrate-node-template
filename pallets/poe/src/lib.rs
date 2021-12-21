@@ -105,6 +105,27 @@ pub mod pallet {
 			Self::deposit_event(Event::ClaimRevoked(sender, proof));
 			Ok(())
 		}
+
+		#[pallet::weight(10_000)]
+		pub fn transfer_claim(
+			origin: OriginFor<T>,
+			proof: Vec<u8>,
+			receiver: T::AccountId,
+		) -> DispatchResult {
+			let sender = ensure_signed(origin)?;
+
+			ensure!(Proofs::<T>::contains_key(&proof),Error::<T>::NoSuchProof);
+		
+			let (owner,_) = Proofs::<T>::get(&proof);
+	
+			let current_block = <frame_system::Pallet<T>>::block_number();
+
+			ensure!(sender == owner, Error::<T>::NotProofOwner);
+
+			Proofs::<T>::insert(&proof,(&receiver, current_block));
+
+			Ok(())
+		}
 	}
 
 }
