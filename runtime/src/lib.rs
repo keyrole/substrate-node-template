@@ -272,9 +272,14 @@ impl pallet_sudo::Config for Runtime {
 	type Call = Call;
 }
 
+parameter_types! {
+	pub const MaxLengthOfHash: u32 = 20;
+}
+
 /// Configure the pallet-template in pallets/template.
 impl pallet_poe::Config for Runtime {
 	type Event = Event;
+	type MaxLengthOfHash = MaxLengthOfHash;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.

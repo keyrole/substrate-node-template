@@ -28,6 +28,17 @@ fn create_claim_failed_when_claim_already_exist() {
 }
 
 #[test]
+fn create_claim_failed_when_claim_hash_is_too_long() {
+    new_test_ext().execute_with(||{
+        let claim = vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+        assert_noop!(
+            PoeModule::create_claim(Origin::signed(1), claim.clone()),
+            Error::<Test>::ProofHashIsTooLong
+        );
+    });
+}
+
+#[test]
 fn revoke_claim_works() {
     new_test_ext().execute_with(||{
         let claim = vec![0,1];
