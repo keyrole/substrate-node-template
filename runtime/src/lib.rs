@@ -22,6 +22,7 @@ use sp_std::prelude::*;
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
+use frame_support::traits::Currency;
 
 // A few exports that help ease life for downstream crates.
 pub use frame_support::{
@@ -42,6 +43,7 @@ pub use sp_runtime::{Perbill, Permill};
 
 /// Import the template pallet.
 pub use pallet_template;
+pub use pallet_kitties;
 
 /// An index to a block.
 pub type BlockNumber = u32;
@@ -277,6 +279,21 @@ impl pallet_template::Config for Runtime {
 	type Event = Event;
 }
 
+parameter_types! {
+	// One can owned at most 9,999 Kitties
+	pub const MaxKittyOwned: u32 = 9999;
+}
+
+impl pallet_kitties::Config for Runtime {
+	type Event = Event;
+
+	type Currency = Balances;
+
+	type KittyRandomness = RandomnessCollectiveFlip;
+
+	type MaxKittyOwned = MaxKittyOwned;   
+}
+
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub enum Runtime where
@@ -294,6 +311,7 @@ construct_runtime!(
 		Sudo: pallet_sudo::{Pallet, Call, Config<T>, Storage, Event<T>},
 		// Include the custom logic from the pallet-template in the runtime.
 		TemplateModule: pallet_template::{Pallet, Call, Storage, Event<T>},
+		Kitties: pallet_kitties::{Pallet, Call, Storage, Event<T>},
 	}
 );
 
