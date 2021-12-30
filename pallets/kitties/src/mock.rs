@@ -25,7 +25,7 @@ frame_support::construct_runtime!(
 		System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
 		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
         RandomnessCollectiveFlip: pallet_randomness_collective_flip::{Pallet, Storage},
-		SubstrateKitties: pallet_kitties::{Pallet, Call, Storage,Config<T>, Event<T>},
+		SubstrateKitties: pallet_kitties::{Pallet, Call, Storage, Config<T>, Event<T>},
 	}
 );
 
@@ -102,7 +102,7 @@ impl pallet_balances::Config for Test {
 impl pallet_randomness_collective_flip::Config for Test {}
 
 parameter_types! {
-	pub const MaxKittyOwned: u32 = 1;
+	pub const MaxKittyOwned: u32 = 2;
 
 }
 

@@ -95,6 +95,26 @@ pub mod pallet {
         StorageMap<_, Twox64Concat, T::AccountId, BoundedVec<T::Hash, T::MaxKittyOwned>, ValueQuery>;
 
     // Todo Part IV: Our pallet's genesis configuration
+	#[pallet::genesis_config]
+	pub struct GenesisConfig<T: Config> {
+		pub kitties: Vec<(T::AccountId, [u8; 16], Gender)>,
+	}
+
+	#[cfg(feature = "std")]
+	impl<T: Config> Default for GenesisConfig<T> {
+		fn default() -> GenesisConfig<T> {
+			GenesisConfig { kitties: vec![] }
+		}
+	}
+
+	#[pallet::genesis_build]
+	impl<T: Config> GenesisBuild<T> for GenesisConfig<T> {
+		fn build(&self) {
+			for (acct, dna, gender) in &self.kitties {
+				let _ = <Pallet<T>>::mint(acct, Some(dna.clone()), Some(gender.clone()));
+			}
+		}
+	}
 
     #[pallet::call]
     impl<T: Config> Pallet<T> {
@@ -105,23 +125,7 @@ pub mod pallet {
             // Action #1: create_kitty
             let owner = ensure_signed(origin)?;
 
-            let kitty = Kitty::<T> {
-                dna: Self::gen_dna(),
-                gender: Self::gen_gender(),
-                owner: owner.clone(),
-                price: None,
-            };
-
-            let kitty_id = T::Hashing::hash_of(&kitty);
-
-            let new_cnt = Self::all_kitties_count().checked_add(1).ok_or(Error::<T>::KittyCntOverflow)?;
-
-            <Kitties_owned<T>>::try_mutate(&owner, |kitty_vec|{
-                kitty_vec.try_push(kitty_id)
-            }).map_err(|_| Error::<T>::ExceedMaxKittyOwned)?;
-
-            <Kitties<T>>::insert(kitty_id, kitty);
-            <KittyCnt<T>>::put(new_cnt);
+            let kitty_id = Self::mint(&owner, None, None)?;
             // log::info!("A kitty is born with ID: {:?}", kitty_id);
 
             // Action #4: Deposit 'Created' event
@@ -142,6 +146,28 @@ pub mod pallet {
 
 	//** Our helper functions.**//
     impl<T:Config> Pallet<T> {
+
+		// mint 
+		fn mint(owner: &T::AccountId, dna: Option<[u8; 16]>, gender: Option<Gender>) -> Result<T::Hash, Error<T>> {
+			let kitty = Kitty::<T> {
+                dna: dna.unwrap_or_else(Self::gen_dna),
+                gender: gender.unwrap_or_else(Self::gen_gender),
+                owner: owner.clone(),
+                price: None,
+            };
+
+            let kitty_id = T::Hashing::hash_of(&kitty);
+
+            let new_cnt = Self::all_kitties_count().checked_add(1).ok_or(Error::<T>::KittyCntOverflow)?;
+
+            <Kitties_owned<T>>::try_mutate(&owner, |kitty_vec|{
+                kitty_vec.try_push(kitty_id)
+            }).map_err(|_| Error::<T>::ExceedMaxKittyOwned)?;
+
+            <Kitties<T>>::insert(kitty_id, kitty);
+            <KittyCnt<T>>::put(new_cnt);
+			Ok(kitty_id)
+		}
 
         // Generate a random gender value
         fn gen_gender() -> Gender {
