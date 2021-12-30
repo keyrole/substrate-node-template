@@ -9,6 +9,12 @@ pub mod pallet {
     use codec::{Encode, Decode};
     use frame_support::sp_io::hashing::blake2_128;
 
+    #[derive(Encode, Decode)]
+    pub struct Kitty(pub [u8; 16]);
+
+    type KittyIndex = u32;
+
+    
     #[pallet::config]
     pub trait Config: frame_system::Config {
         type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
@@ -24,6 +30,18 @@ pub mod pallet {
     pub enum Event<T: Config> {
 
     }
+
+    #[pallet::storage]
+    #[pallet::getter(fn kitties_count)]
+    pub type KittiesCount<T> = StorageValue<_, u32>;
+
+    #[pallet::storage]
+    #[pallet::getter(fn kitties)]
+    pub type Kitties<T> = StorageMap<_, Blake2_128Concat, KittyIndex, Option<Kitty>, ValueQuery>;
+    
+    #[pallet::storage]
+    #[pallet::getter(fn owner)]
+    pub type Owner<T: Config> = StorageMap<_, Blake2_128Concat, KittyIndex, Option<T::AccountId>, ValueQuery>;
 
     #[pallet::error]
     pub enum Error<T> {
