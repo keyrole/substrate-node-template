@@ -10,13 +10,22 @@ mod tests;
 
 #[frame_support::pallet]
 pub mod pallet {
-    use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::Randomness};
+    use frame_support::{dispatch::DispatchResult, pallet_prelude::*};
+    use frame_support::{traits::{Randomness, Currency, tokens::ExistenceRequirement}, transactional};
     use frame_system::pallet_prelude::*;
     use codec::{Encode, Decode};
     use frame_support::sp_io::hashing::blake2_128;
 
-    #[derive(Encode, Decode)]
-    pub struct Kitty(pub [u8; 16]);
+    type AccountOf<T> = <T as frame_system::Config>::AccountId;
+    type BalanceOf<T> = <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+    
+
+    #[derive(Clone, Encode, Decode, PartialEq)]
+    pub struct Kitty<T: Config> {
+        pub dna: [u8; 16],
+        pub owner: AccountOf<T>,
+        pub price: Option<BalanceOf<T>>,
+    }
 
     type KittyIndex = u32;
 
@@ -25,6 +34,7 @@ pub mod pallet {
     pub trait Config: frame_system::Config {
         type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
         type Randomness: Randomness<Self::Hash, Self::BlockNumber>;
+        type Currency: Currency<Self::AccountId>;
     }
 
     #[pallet::pallet]
@@ -45,11 +55,11 @@ pub mod pallet {
 
     #[pallet::storage]
     #[pallet::getter(fn kitties)]
-    pub type Kitties<T> = StorageMap<_, Blake2_128Concat, KittyIndex, Option<Kitty>, ValueQuery>;
+    pub type Kitties<T> = StorageMap<_, Blake2_128Concat, KittyIndex, Option<Kitty<T>>, ValueQuery>;
     
     #[pallet::storage]
-    #[pallet::getter(fn owner)]
-    pub type Owner<T: Config> = StorageMap<_, Blake2_128Concat, KittyIndex, Option<T::AccountId>, ValueQuery>;
+    #[pallet::getter(fn kitty_owned)]
+    pub type KittiesOwned<T: Config> = StorageMap<_, Blake2_128Concat, T::AccountId, Vec<KittyIndex>, ValueQuery>;
 
     #[pallet::error]
     pub enum Error<T> {
@@ -57,6 +67,28 @@ pub mod pallet {
         NotOwner,
         InvalidKittyIndex,
         SameParentIndex,
+        PushKittiesOwnedFailed,
+    }
+
+    #[pallet::genesis_config]
+    pub struct GenesisConfig<T: Config> {
+        pub kitties: Vec<(T::AccountId, [u8; 16])>,
+    }
+
+    #[cfg(feature = "std")]
+    impl<T: Config> Default for GenesisConfig<T> {
+        fn default() -> GenesisConfig<T> {
+            GenesisConfig { kitties: vec![] }
+        }
+    }
+
+    #[pallet::genesis_build]
+    impl<T: Config> GenesisBuild<T> for GenesisConfig<T> {
+        fn build(&self) {
+            for (acct, dna) in &self.kitties {
+                let _ = <Pallet<T>>::mint(acct, Some(dna.clone()));
+            }
+        }
     }
 
     #[pallet::call]
@@ -65,80 +97,64 @@ pub mod pallet {
         pub fn create(origin: OriginFor<T>) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
-            let kitty_id = match Self::kitties_count() {
-                Some(id) => {
-                    ensure!(id != KittyIndex::max_value(), Error::<T>::KittiesCountOverflow);
-                    id
-                },
-                None => {
-                    1
-                }
-            };
-
-            let dna = Self::random_value(&who);
-
-            Kitties::<T>::insert(kitty_id, Some(Kitty(dna)));
-
-            Owner::<T>::insert(kitty_id, Some(who.clone()));
-
-            KittiesCount::<T>::put(kitty_id + 1);
+            let kitty_id = Self::mint(&who, None)?;
 
             Self::deposit_event(Event::KittyCreate(who, kitty_id));
 
             Ok(())
         }
 
-        #[pallet::weight(0)]
-        pub fn transfer(origin: OriginFor<T>, new_owner: T::AccountId, kitty_id: KittyIndex) -> DispatchResult {
-            let who = ensure_signed(origin)?;
+        // #[pallet::weight(0)]
+        // pub fn transfer(origin: OriginFor<T>, new_owner: T::AccountId, kitty_id: KittyIndex) -> DispatchResult {
+        //     let who = ensure_signed(origin)?;
 
-            ensure!(Some(who.clone()) == Owner::<T>::get(kitty_id), Error::<T>::NotOwner);
+        //     ensure!(Some(who.clone()) == Owner::<T>::get(kitty_id), Error::<T>::NotOwner);
 
-            Owner::<T>::insert(kitty_id, Some(new_owner.clone()));
+        //     Owner::<T>::insert(kitty_id, Some(new_owner.clone()));
 
-            Self::deposit_event(Event::KittyTransfer(who, new_owner, kitty_id));
+        //     Self::deposit_event(Event::KittyTransfer(who, new_owner, kitty_id));
 
-            Ok(())
-        }
+        //     Ok(())
+        // }
 
-        #[pallet::weight(0)]
-        pub fn breed(origin: OriginFor<T>, kitty_id_1: KittyIndex, kitty_id_2: KittyIndex) -> DispatchResult {
-            let who = ensure_signed(origin)?;
-            ensure!(kitty_id_1 != kitty_id_2, Error::<T>::SameParentIndex);
+        // #[pallet::weight(0)]
+        // pub fn breed(origin: OriginFor<T>, kitty_id_1: KittyIndex, kitty_id_2: KittyIndex) -> DispatchResult {
+        //     let who = ensure_signed(origin)?;
+        //     ensure!(kitty_id_1 != kitty_id_2, Error::<T>::SameParentIndex);
 
-            let kitty1 = Self::kitties(kitty_id_1).ok_or(Error::<T>::InvalidKittyIndex)?;
-            let kitty2 = Self::kitties(kitty_id_2).ok_or(Error::<T>::InvalidKittyIndex)?;
-            ensure!(Some(who.clone()) == Owner::<T>::get(kitty_id_1), Error::<T>::NotOwner);
-            ensure!(Some(who.clone()) == Owner::<T>::get(kitty_id_2), Error::<T>::NotOwner);
+        //     let kitty1 = Self::kitties(kitty_id_1).ok_or(Error::<T>::InvalidKittyIndex)?;
+        //     let kitty2 = Self::kitties(kitty_id_2).ok_or(Error::<T>::InvalidKittyIndex)?;
+        //     ensure!(Some(who.clone()) == Owner::<T>::get(kitty_id_1), Error::<T>::NotOwner);
+        //     ensure!(Some(who.clone()) == Owner::<T>::get(kitty_id_2), Error::<T>::NotOwner);
 
-            let kitty_id = match Self::kitties_count() {
-                Some(id) => {
-                    ensure!(id != KittyIndex::max_value(), Error::<T>::KittiesCountOverflow);
-                    id
-                },
-                None => {
-                    1
-                }
-            };
+        //     let kitty_id = match Self::kitties_count() {
+        //         Some(id) => {
+        //             ensure!(id != KittyIndex::max_value(), Error::<T>::KittiesCountOverflow);
+        //             id
+        //         },
+        //         None => {
+        //             1
+        //         }
+        //     };
 
-            let dna_1 = kitty1.0;
-            let dna_2 = kitty2.0;
+        //     let dna_1 = kitty1.0;
+        //     let dna_2 = kitty2.0;
 
-            let selector = Self::random_value(&who);
-            let mut new_dna = [0u8; 16];
+        //     let selector = Self::random_value(&who);
+        //     let mut new_dna = [0u8; 16];
 
-            for i in 0..dna_1.len() {
-                new_dna[i] = (selector[i] & dna_1[i]) | (selector[i] & dna_2[i]);
-            }
+        //     for i in 0..dna_1.len() {
+        //         new_dna[i] = (selector[i] & dna_1[i]) | (selector[i] & dna_2[i]);
+        //     }
 
-            Kitties::<T>::insert(kitty_id, Some(Kitty(new_dna)));
-            Owner::<T>::insert(kitty_id, Some(who.clone()));
-            KittiesCount::<T>::put(kitty_id + 1);
+        //     Kitties::<T>::insert(kitty_id, Some(Kitty(new_dna)));
+        //     Owner::<T>::insert(kitty_id, Some(who.clone()));
+        //     KittiesCount::<T>::put(kitty_id + 1);
 
-            Self::deposit_event(Event::KittyCreate(who, kitty_id));
+        //     Self::deposit_event(Event::KittyCreate(who, kitty_id));
 
-            Ok(())
-        }
+        //     Ok(())
+        // }
 
     }
 
@@ -152,5 +168,36 @@ pub mod pallet {
             payload.using_encoded(blake2_128)
         }
 
+        fn mint(acct: &T::AccountId, mut dna: Option<[u8; 16]>) -> Result<KittyIndex, Error<T>> {
+            let kitty_id = match Self::kitties_count() {
+                Some(id) => {
+                    ensure!(id != KittyIndex::max_value(), Error::<T>::KittiesCountOverflow);
+                    id
+                },
+                None => {
+                    0
+                }
+            };
+
+            if let None = dna {
+                dna = Some(Self::random_value(&acct));
+            };
+
+            let kitty = Kitty::<T> {
+                dna: dna.unwrap(),
+                owner: acct.clone(),
+                price: None,
+            };
+
+            Kitties::<T>::insert(kitty_id, Some(kitty));
+
+            KittiesOwned::<T>::mutate(&acct, |kitty_vec|{
+                kitty_vec.push(kitty_id)
+            });
+
+            KittiesCount::<T>::put(kitty_id + 1);
+
+            Ok(kitty_id)
+        }
     }
 }

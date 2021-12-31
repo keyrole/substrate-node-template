@@ -4,6 +4,7 @@ use frame_support::parameter_types;
 use sp_runtime::{
 	traits::{BlakeTwo256, IdentityLookup}, testing::Header,
 };
+use sp_runtime::BuildStorage;
 use frame_system as system;
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
@@ -17,6 +18,7 @@ frame_support::construct_runtime!(
 		UncheckedExtrinsic = UncheckedExtrinsic,
 	{
 		System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
+		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
         RandomnessCollectiveFlip: pallet_randomness_collective_flip::{Pallet, Storage},
 		KittiesModule: pallet_kitties::{Pallet, Call, Storage, Event<T>},
 	}
@@ -56,13 +58,48 @@ impl system::Config for Test {
 impl pallet_kitties::Config for Test {
 	type Event = Event;
     type Randomness = RandomnessCollectiveFlip;
+	type Currency = Balances;
 
 }
 
 impl pallet_randomness_collective_flip::Config for Test {}
 
+parameter_types!{
+	pub const ExistentialDeposit: u64 = 1;
+}
+
+impl pallet_balances::Config for Test {
+	type AccountStore = AccountData<u64>;
+	type Balance = u64;
+	type DustRemoval = ();
+	type Event = Event;
+	type ExistentialDeposit = ExistentialDeposit;
+	type MaxLocks = ();
+	type MaxReserves = ();
+	type ReserveIdentifier = [u8; 8];
+	type WeightInfo = ();
+}
+
 
 // Build genesis storage according to the mock runtime.
 pub fn new_test_ext() -> sp_io::TestExternalities {
-	system::GenesisConfig::default().build_storage::<Test>().unwrap().into()
+	let mut t = system::GenesisConfig::default().build_storage::<Test>().unwrap();
+	GenesisConfig {
+		balances: BalancesConfig {
+			balances: vec![(1,100), (2,100)]
+		},
+		substrate_kitties: SubstrateKittiesConfig {
+			kitties: vec![
+				(1, 100, None),
+				(2, 101, None)
+			]
+		},
+		..Default::default()
+	}
+		.assimilate_storage(&mut t)
+		.unwrap();
+
+	let mut ext = sp_io::TestExternalities::new(t);
+	ext.execute_with(||System::set_block_number(1));
+	ext
 }
