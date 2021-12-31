@@ -74,6 +74,10 @@ pub mod pallet {
         KittyNotExist,
         NotKittyOwner,
         TransferToSelf,
+        BuyerIsKittyOwner,
+        KittyBidPriceTooLow,
+        KittyNotForSale,
+        InsufficientBalance,
     }
 
     #[pallet::event]
@@ -83,6 +87,7 @@ pub mod pallet {
         Created(T::AccountId, T::Hash),
         PriceSet(T::AccountId, T::Hash, Option<BalanceOf<T>>),
         Transferred(T::AccountId, T::AccountId, T::Hash),
+        Bought(T::AccountId, T::AccountId, T::Hash, BalanceOf<T>),
     }
 
     #[pallet::storage]
@@ -175,6 +180,36 @@ pub mod pallet {
         }
 
         // todo part IV: buy_kitty
+        #[transactional]
+        #[pallet::weight(100)]
+        pub fn buy_kitty(origin: OriginFor<T>, kitty_id: T::Hash, bid_price: BalanceOf<T>) -> DispatchResult {
+            let buyer = ensure_signed(origin)?;
+
+            let kitty = Self::kitties(&kitty_id).ok_or(Error::<T>::KittyNotExist)?;
+            ensure!(kitty.owner != buyer, Error::<T>::BuyerIsKittyOwner);
+
+            if let Some(ask_price) = kitty.price {
+                ensure!(ask_price <= bid_price, Error::<T>::KittyBidPriceTooLow);
+            } else {
+                Err(Error::<T>::KittyNotForSale)?;
+            }
+
+            ensure!(T::Currency::free_balance(&buyer) >= bid_price, Error::<T>::InsufficientBalance);
+
+            let buyer_owned = Kitties_owned::<T>::get(&buyer);
+            ensure!((buyer_owned.len() as u32) < T::MaxKittyOwned::get(), Error::<T>::ExceedMaxKittyOwned);
+
+            let seller = kitty.owner.clone();
+
+            T::Currency::transfer(&buyer, &seller, bid_price, ExistenceRequirement::KeepAlive)?;
+
+            Self::transfer_kitty_to(&kitty_id, &buyer)?;
+
+            Self::deposit_event(Event::Bought(buyer, seller, kitty_id, bid_price));
+
+            Ok(())
+        }
+
 
         // todo part IV: breed_kitty
 
@@ -182,7 +217,7 @@ pub mod pallet {
 
 	//** Our helper functions.**//
     impl<T:Config> Pallet<T> {
-
+        // todo part III: helper functions for dispatchable functions
         fn is_kitty_owner(kitty_id: &T::Hash, acct: &T::AccountId) -> Result<bool, Error<T>> {
             match Self::kitties(kitty_id) {
                 Some(kitty) => Ok(kitty.owner == *acct),
@@ -190,7 +225,26 @@ pub mod pallet {
             }
         }
 
-		// mint 
+
+        // Generate a random gender value
+        fn gen_gender() -> Gender {
+            let random = T::KittyRandomness::random(&b"gender"[..]).0;
+            match random.as_ref()[0] %2 {
+                0 => Gender::Male,
+                _ => Gender::Female,
+            }
+        }
+
+        // Generate a random DNA value
+        fn gen_dna() -> [u8; 16] {
+            let payload = (
+                T::KittyRandomness::random(&b"dna"[..]).0,
+                <frame_system::Pallet<T>>::block_number(),
+            );
+            payload.using_encoded(blake2_128)
+        }
+
+        // Todo part III: mint
 		fn mint(owner: &T::AccountId, dna: Option<[u8; 16]>, gender: Option<Gender>) -> Result<T::Hash, Error<T>> {
 			let kitty = Kitty::<T> {
                 dna: dna.unwrap_or_else(Self::gen_dna),
@@ -212,29 +266,9 @@ pub mod pallet {
 			Ok(kitty_id)
 		}
 
-        // Generate a random gender value
-        fn gen_gender() -> Gender {
-            let random = T::KittyRandomness::random(&b"gender"[..]).0;
-            match random.as_ref()[0] %2 {
-                0 => Gender::Male,
-                _ => Gender::Female,
-            }
-        }
-
-        // Generate a random DNA value
-        fn gen_dna() -> [u8; 16] {
-            let payload = (
-                T::KittyRandomness::random(&b"dna"[..]).0,
-                <frame_system::Pallet<T>>::block_number(),
-            );
-            payload.using_encoded(blake2_128)
-        }
-
-        // todo part III: helper functions for dispatchable functions
-
-        // Todo part III: mint
 
         // Todo part IV: transfer_kitty_to
+        #[transactional]
         fn transfer_kitty_to(kitty_id: &T::Hash, receiver: &T::AccountId) -> Result<(), Error<T>> {
             let mut kitty = Self::kitties(&kitty_id).ok_or(Error::<T>::KittyNotExist)?;
             let prev_owner = kitty.owner.clone();

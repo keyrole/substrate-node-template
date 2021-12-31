@@ -3,6 +3,7 @@
 use crate::{mock::*, Error};
 use frame_support::{assert_noop, assert_ok};
 
+
 #[test]
 fn create_a_kitty_successfully() {
     new_test_ext().execute_with(||{
@@ -38,6 +39,19 @@ fn transfer_kitty_should_work() {
         assert_ok!(SubstrateKitties::tranfer_kitty(Origin::signed(1), SubstrateKitties::kitties_owned(1)[0], 2));
         assert_eq!(SubstrateKitties::kitties_owned(2).len(), 2);
         assert_eq!(SubstrateKitties::kitties_owned(1).len(), 0);
+
+    });
+}
+
+#[test]
+fn buy_kitty_should_work(){
+    new_test_ext().execute_with(||{
+        assert_ok!(SubstrateKitties::set_price(Origin::signed(1), SubstrateKitties::kitties_owned(1)[0], Some(3)));
+        assert_ok!(SubstrateKitties::buy_kitty(Origin::signed(2), SubstrateKitties::kitties_owned(1)[0], 4));
+        assert_eq!(SubstrateKitties::kitties_owned(1).len(), 0);
+        assert_eq!(SubstrateKitties::kitties_owned(2).len(), 2);
+        assert_eq!(Balances::free_balance(&1), 14);
+        assert_eq!(Balances::free_balance(&2), 6);
 
     });
 }
