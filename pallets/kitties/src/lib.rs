@@ -71,6 +71,9 @@ pub mod pallet {
         OverMaxNumber,
         KittyCntOverflow,
         ExceedMaxKittyOwned,
+        KittyNotExist,
+        NotKittyOwner,
+        TransferToSelf,
     }
 
     #[pallet::event]
@@ -78,6 +81,8 @@ pub mod pallet {
     pub enum Event<T: Config> {
         // Action #3: Declare events
         Created(T::AccountId, T::Hash),
+        PriceSet(T::AccountId, T::Hash, Option<BalanceOf<T>>),
+        Transferred(T::AccountId, T::AccountId, T::Hash),
     }
 
     #[pallet::storage]
@@ -135,8 +140,39 @@ pub mod pallet {
         }
 
         // todo part IV: set_price
+        #[pallet::weight(100)]
+        pub fn set_price(origin: OriginFor<T>, kitty_id: T::Hash, new_price: Option<BalanceOf<T>>) -> DispatchResult {
+            let owner = ensure_signed(origin)?;
+
+            ensure!(Self::is_kitty_owner(&kitty_id, &owner)?, Error::<T>::NotKittyOwner);
+
+            if let Some(mut kitty) = Self::kitties(&kitty_id) {
+                kitty.price = new_price.clone();
+                Kitties::<T>::insert(&kitty_id, kitty);
+                Self::deposit_event(Event::PriceSet(owner, kitty_id, new_price));
+                Ok(())
+            } else {
+                Err(Error::<T>::KittyNotExist)?
+            }
+
+        }
 
         // todo part IV: transfer
+        #[pallet::weight(100)]
+        pub fn tranfer_kitty(origin: OriginFor<T>, kitty_id: T::Hash, receiver: T::AccountId) -> DispatchResult {
+            let sender = ensure_signed(origin)?;
+
+            ensure!(Self::is_kitty_owner(&kitty_id, &sender)?, Error::<T>::NotKittyOwner);
+            ensure!(sender != receiver, Error::<T>::TransferToSelf);
+            let receiver_owned = Kitties_owned::<T>::get(&receiver);
+            ensure!((receiver_owned.len() as u32) < T::MaxKittyOwned::get(), Error::<T>::ExceedMaxKittyOwned);
+
+            Self::transfer_kitty_to(&kitty_id, &receiver)?;
+
+            Self::deposit_event(Event::Transferred(sender, receiver, kitty_id));
+
+            Ok(())
+        }
 
         // todo part IV: buy_kitty
 
@@ -146,6 +182,13 @@ pub mod pallet {
 
 	//** Our helper functions.**//
     impl<T:Config> Pallet<T> {
+
+        fn is_kitty_owner(kitty_id: &T::Hash, acct: &T::AccountId) -> Result<bool, Error<T>> {
+            match Self::kitties(kitty_id) {
+                Some(kitty) => Ok(kitty.owner == *acct),
+                None => Err(Error::<T>::KittyNotExist)
+            }
+        }
 
 		// mint 
 		fn mint(owner: &T::AccountId, dna: Option<[u8; 16]>, gender: Option<Gender>) -> Result<T::Hash, Error<T>> {
@@ -192,6 +235,29 @@ pub mod pallet {
         // Todo part III: mint
 
         // Todo part IV: transfer_kitty_to
+        fn transfer_kitty_to(kitty_id: &T::Hash, receiver: &T::AccountId) -> Result<(), Error<T>> {
+            let mut kitty = Self::kitties(&kitty_id).ok_or(Error::<T>::KittyNotExist)?;
+            let prev_owner = kitty.owner.clone();
+
+            Kitties_owned::<T>::try_mutate(&prev_owner, |owned| {
+                if let Some(ind) = owned.iter().position(|&id| id == *kitty_id) {
+                    owned.swap_remove(ind);
+                    return Ok(())
+                }
+                Err(())
+            }).map_err(|_| Error::<T>::KittyNotExist)?;
+
+            kitty.owner = receiver.clone();
+            kitty.price = None;
+
+            Kitties::<T>::insert(kitty_id, kitty);
+
+            Kitties_owned::<T>::try_mutate(receiver, |vec|{
+                vec.try_push(*kitty_id)
+            }).map_err(|_| Error::<T>::ExceedMaxKittyOwned)?;
+
+            Ok(())
+        }
 
     }
 }

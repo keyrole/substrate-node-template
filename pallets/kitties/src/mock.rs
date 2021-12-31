@@ -102,7 +102,7 @@ impl pallet_balances::Config for Test {
 impl pallet_randomness_collective_flip::Config for Test {}
 
 parameter_types! {
-	pub const MaxKittyOwned: u32 = 2;
+	pub const MaxKittyOwned: u32 = 3;
 
 }
 
