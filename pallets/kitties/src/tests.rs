@@ -55,3 +55,14 @@ fn buy_kitty_should_work(){
 
     });
 }
+
+#[test]
+fn breed_kitty_should_work() {
+    new_test_ext().execute_with(||{
+        assert_eq!(SubstrateKitties::all_kitties_count(), 2);
+        assert_ok!(SubstrateKitties::create_kitty(Origin::signed(1)));
+        assert_eq!(SubstrateKitties::all_kitties_count(), 3);
+        assert_ok!(SubstrateKitties::breed_kitty(Origin::signed(1), SubstrateKitties::kitties_owned(1)[0], SubstrateKitties::kitties_owned(1)[1]));
+        assert_eq!(SubstrateKitties::all_kitties_count(), 4);
+    });
+}
