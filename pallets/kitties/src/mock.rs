@@ -20,7 +20,7 @@ frame_support::construct_runtime!(
 		System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
 		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
         RandomnessCollectiveFlip: pallet_randomness_collective_flip::{Pallet, Storage},
-		KittiesModule: pallet_kitties::{Pallet, Call, Storage, Event<T>},
+		SubstrateKitties: pallet_kitties::{Pallet, Call, Storage, Config<T>, Event<T>},
 	}
 );
 
@@ -30,29 +30,53 @@ parameter_types! {
 }
 
 impl system::Config for Test {
+	// type BaseCallFilter = ();
+	// type BlockWeights = ();
+	// type BlockLength = ();
+	// type DbWeight = ();
+	// type Origin = Origin;
+	// type Call = Call;
+	// type Index = u64;
+	// type BlockNumber = u64;
+	// type Hash = H256;
+	// type Hashing = BlakeTwo256;
+	// type AccountId = u64;
+	// type Lookup = IdentityLookup<Self::AccountId>;
+	// type Header = Header;
+	// type Event = Event;
+	// type BlockHashCount = BlockHashCount;
+	// type Version = ();
+	// type PalletInfo = PalletInfo;
+	// type AccountData = ();
+	// type OnNewAccount = ();
+	// type OnKilledAccount = ();
+	// type SystemWeightInfo = ();
+	// type SS58Prefix = SS58Prefix;
+	// type OnSetCode = ();
+	type AccountData = pallet_balances::AccountData<u64>;
+	type AccountId = u64;
 	type BaseCallFilter = ();
-	type BlockWeights = ();
+	// type BaseCallFilter = Type;
+	type BlockHashCount = BlockHashCount;
 	type BlockLength = ();
-	type DbWeight = ();
-	type Origin = Origin;
-	type Call = Call;
-	type Index = u64;
 	type BlockNumber = u64;
+	type BlockWeights = ();
+	type Call = Call;
+	type DbWeight = ();
+	type Event = Event;
 	type Hash = H256;
 	type Hashing = BlakeTwo256;
-	type AccountId = u64;
-	type Lookup = IdentityLookup<Self::AccountId>;
 	type Header = Header;
-	type Event = Event;
-	type BlockHashCount = BlockHashCount;
-	type Version = ();
-	type PalletInfo = PalletInfo;
-	type AccountData = ();
-	type OnNewAccount = ();
+	type Index = u64;
+	type Lookup = IdentityLookup<Self::AccountId>;
 	type OnKilledAccount = ();
-	type SystemWeightInfo = ();
-	type SS58Prefix = SS58Prefix;
+	type OnNewAccount = ();
 	type OnSetCode = ();
+	type Origin = Origin;
+	type PalletInfo = PalletInfo;
+	type SS58Prefix = SS58Prefix;
+	type SystemWeightInfo = ();
+	type Version = ();
 }
 
 impl pallet_kitties::Config for Test {
@@ -69,7 +93,7 @@ parameter_types!{
 }
 
 impl pallet_balances::Config for Test {
-	type AccountStore = AccountData<u64>;
+	type AccountStore = System;
 	type Balance = u64;
 	type DustRemoval = ();
 	type Event = Event;
@@ -90,8 +114,8 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 		},
 		substrate_kitties: SubstrateKittiesConfig {
 			kitties: vec![
-				(1, 100, None),
-				(2, 101, None)
+				(1, [0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0]),
+				(2, [1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0])
 			]
 		},
 		..Default::default()

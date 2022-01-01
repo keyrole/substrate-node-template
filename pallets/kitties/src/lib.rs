@@ -68,6 +68,7 @@ pub mod pallet {
         InvalidKittyIndex,
         SameParentIndex,
         PushKittiesOwnedFailed,
+        KittyNotExist,
     }
 
     #[pallet::genesis_config]
@@ -104,18 +105,18 @@ pub mod pallet {
             Ok(())
         }
 
-        // #[pallet::weight(0)]
-        // pub fn transfer(origin: OriginFor<T>, new_owner: T::AccountId, kitty_id: KittyIndex) -> DispatchResult {
-        //     let who = ensure_signed(origin)?;
+        #[pallet::weight(0)]
+        pub fn transfer(origin: OriginFor<T>, new_owner: T::AccountId, kitty_id: KittyIndex) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+            ensure!(None != Self::kitties(kitty_id), Error::<T>::KittyNotExist);
+            ensure!(who.clone() == Self::kitties(kitty_id).unwrap().owner, Error::<T>::NotOwner);
 
-        //     ensure!(Some(who.clone()) == Owner::<T>::get(kitty_id), Error::<T>::NotOwner);
+            Self::transfer_kitty_to(kitty_id, &new_owner)?;
 
-        //     Owner::<T>::insert(kitty_id, Some(new_owner.clone()));
+            Self::deposit_event(Event::KittyTransfer(who, new_owner, kitty_id));
 
-        //     Self::deposit_event(Event::KittyTransfer(who, new_owner, kitty_id));
-
-        //     Ok(())
-        // }
+            Ok(())
+        }
 
         // #[pallet::weight(0)]
         // pub fn breed(origin: OriginFor<T>, kitty_id_1: KittyIndex, kitty_id_2: KittyIndex) -> DispatchResult {
@@ -198,6 +199,34 @@ pub mod pallet {
             KittiesCount::<T>::put(kitty_id + 1);
 
             Ok(kitty_id)
+        }
+
+        fn transfer_kitty_to(kitty_id: KittyIndex, receiver: &T::AccountId) -> Result<(), Error<T>> {
+            
+            // ensure the kitty exists
+            let mut kitty = Self::kitties(kitty_id).ok_or(Error::<T>::KittyNotExist)?;
+
+            let sender = kitty.owner.clone();
+
+            kitty.owner = receiver.clone();
+
+            // modify the owned map first
+            KittiesOwned::<T>::mutate(&sender, |owned_vec|{
+                if let Some(found_id) = owned_vec.iter().position(|&id| id == kitty_id) {
+                    owned_vec.swap_remove(found_id);
+                    return Ok(());
+                }
+                Err(())
+            }).map_err(|_| Error::<T>::NotOwner)?;
+
+            KittiesOwned::<T>::mutate(&receiver, |vec|{
+                vec.push(kitty_id)
+            });
+
+
+            Kitties::<T>::insert(kitty_id, Some(kitty));
+            Ok(())
+            
         }
     }
 }
