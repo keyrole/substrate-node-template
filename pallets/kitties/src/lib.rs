@@ -118,44 +118,18 @@ pub mod pallet {
             Ok(())
         }
 
-        // #[pallet::weight(0)]
-        // pub fn breed(origin: OriginFor<T>, kitty_id_1: KittyIndex, kitty_id_2: KittyIndex) -> DispatchResult {
-        //     let who = ensure_signed(origin)?;
-        //     ensure!(kitty_id_1 != kitty_id_2, Error::<T>::SameParentIndex);
+        #[pallet::weight(0)]
+        pub fn breed(origin: OriginFor<T>, kitty_id_1: KittyIndex, kitty_id_2: KittyIndex) -> DispatchResult {
+            let who = ensure_signed(origin)?;
 
-        //     let kitty1 = Self::kitties(kitty_id_1).ok_or(Error::<T>::InvalidKittyIndex)?;
-        //     let kitty2 = Self::kitties(kitty_id_2).ok_or(Error::<T>::InvalidKittyIndex)?;
-        //     ensure!(Some(who.clone()) == Owner::<T>::get(kitty_id_1), Error::<T>::NotOwner);
-        //     ensure!(Some(who.clone()) == Owner::<T>::get(kitty_id_2), Error::<T>::NotOwner);
+            let kitty_id = Self::breed_kitty(&who, kitty_id_1, kitty_id_2)?;
 
-        //     let kitty_id = match Self::kitties_count() {
-        //         Some(id) => {
-        //             ensure!(id != KittyIndex::max_value(), Error::<T>::KittiesCountOverflow);
-        //             id
-        //         },
-        //         None => {
-        //             1
-        //         }
-        //     };
+            Self::deposit_event(Event::KittyCreate(who, kitty_id));
 
-        //     let dna_1 = kitty1.0;
-        //     let dna_2 = kitty2.0;
+            Ok(())
+        }
 
-        //     let selector = Self::random_value(&who);
-        //     let mut new_dna = [0u8; 16];
 
-        //     for i in 0..dna_1.len() {
-        //         new_dna[i] = (selector[i] & dna_1[i]) | (selector[i] & dna_2[i]);
-        //     }
-
-        //     Kitties::<T>::insert(kitty_id, Some(Kitty(new_dna)));
-        //     Owner::<T>::insert(kitty_id, Some(who.clone()));
-        //     KittiesCount::<T>::put(kitty_id + 1);
-
-        //     Self::deposit_event(Event::KittyCreate(who, kitty_id));
-
-        //     Ok(())
-        // }
 
     }
 
@@ -227,6 +201,48 @@ pub mod pallet {
             Kitties::<T>::insert(kitty_id, Some(kitty));
             Ok(())
             
+        }
+
+        fn breed_kitty(owner: &T::AccountId, kitty_id_1: KittyIndex, kitty_id_2: KittyIndex) -> Result<KittyIndex, Error<T>> {
+            ensure!(kitty_id_1 != kitty_id_2, Error::<T>::SameParentIndex);
+
+            let kitty1 = Self::kitties(kitty_id_1).ok_or(Error::<T>::InvalidKittyIndex)?;
+            let kitty2 = Self::kitties(kitty_id_2).ok_or(Error::<T>::InvalidKittyIndex)?;
+            ensure!(owner.clone() == Self::kitties(kitty_id_1).unwrap().owner, Error::<T>::NotOwner);
+            ensure!(owner.clone() == Self::kitties(kitty_id_2).unwrap().owner, Error::<T>::NotOwner);
+
+            let kitty_id = match Self::kitties_count() {
+                Some(id) => {
+                    ensure!(id != KittyIndex::max_value(), Error::<T>::KittiesCountOverflow);
+                    id
+                },
+                None => {
+                    0
+                }
+            };
+
+            let dna_1 = kitty1.dna;
+            let dna_2 = kitty2.dna;
+
+            let selector = Self::random_value(&owner);
+            let mut new_dna = [0u8; 16];
+
+            for i in 0..dna_1.len() {
+                new_dna[i] = (selector[i] & dna_1[i]) | (selector[i] & dna_2[i]);
+            }
+
+            let new_kitty = Kitty::<T> {
+                dna: new_dna,
+                owner: owner.clone(),
+                price: None,
+            };
+
+            Kitties::<T>::insert(kitty_id, Some(new_kitty));
+            KittiesOwned::<T>::mutate(owner.clone(), |vec|{
+                vec.push(kitty_id);
+            });
+            KittiesCount::<T>::put(kitty_id + 1);
+            Ok(kitty_id)
         }
     }
 }

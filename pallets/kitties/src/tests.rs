@@ -41,9 +41,32 @@ fn transfer_failed_because_kitty_not_exists() {
     });
 }
 
-
-fn tmp() {
+#[test]
+fn breed_should_work() {
     new_test_ext().execute_with(||{
-
+        assert_ok!(SubstrateKitties::transfer(Origin::signed(2), 1, 1));
+        assert_eq!(SubstrateKitties::kitty_owned(1), [0, 1]);
+        assert_ok!(SubstrateKitties::breed(Origin::signed(1), 0, 1));
+        assert_eq!(SubstrateKitties::kitty_owned(1), [0, 1, 2]);
+        assert_eq!(SubstrateKitties::kitties_count(), Some(3));
+        assert_eq!(SubstrateKitties::kitties(2).unwrap().owner, 1);
     });
 }
+
+// fn tmp() {
+//     new_test_ext().execute_with(||{
+
+//     });
+// }
+
+// fn tmp() {
+//     new_test_ext().execute_with(||{
+
+//     });
+// }
+
+// fn tmp() {
+//     new_test_ext().execute_with(||{
+
+//     });
+// }
