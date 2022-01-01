@@ -53,17 +53,51 @@ fn breed_should_work() {
     });
 }
 
+#[test]
+fn breed_failed_because_the_two_kitties_are_the_same() {
+    new_test_ext().execute_with(||{
+        assert_noop!(
+            SubstrateKitties::breed(Origin::signed(1), 0, 0),
+            Error::<Test>::SameParentIndex
+        );
+    });
+}
+
+#[test]
+fn breed_failed_because_invalid_kitty_index() {
+    new_test_ext().execute_with(||{
+        assert_noop!(
+            SubstrateKitties::breed(Origin::signed(1), 0, 10),
+            Error::<Test>::InvalidKittyIndex
+        );
+        assert_noop!(
+            SubstrateKitties::breed(Origin::signed(1), 10, 0),
+            Error::<Test>::InvalidKittyIndex
+        );
+    });
+}
+
+#[test]
+fn breed_failed_because_parent_kitty_not_ownered_by_signer() {
+    new_test_ext().execute_with(||{
+        assert_noop!(
+            SubstrateKitties::breed(Origin::signed(1), 1, 0),
+            Error::<Test>::NotOwner
+        );
+        assert_noop!(
+            SubstrateKitties::breed(Origin::signed(1), 0, 1),
+            Error::<Test>::NotOwner
+        );
+    });
+}
+
+
 // fn tmp() {
 //     new_test_ext().execute_with(||{
 
 //     });
 // }
 
-// fn tmp() {
-//     new_test_ext().execute_with(||{
-
-//     });
-// }
 
 // fn tmp() {
 //     new_test_ext().execute_with(||{
