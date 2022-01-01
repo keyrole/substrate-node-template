@@ -47,6 +47,9 @@ pub mod pallet {
     pub enum Event<T: Config> {
         KittyCreate(T::AccountId, KittyIndex),
         KittyTransfer(T::AccountId, T::AccountId, KittyIndex),
+        SellKitty(T::AccountId, KittyIndex, Option<BalanceOf<T>>),
+        CancelSellKitty(T::AccountId, KittyIndex),
+        BuyKitty(T::AccountId, T::AccountId, KittyIndex, BalanceOf<T>),
     }
 
     #[pallet::storage]
@@ -69,6 +72,10 @@ pub mod pallet {
         SameParentIndex,
         PushKittiesOwnedFailed,
         KittyNotExist,
+        CanNotBuyTheKittyYouOwned,
+        TheKittyIsNotOnSell,
+        BidPriceIsTooLow,
+        InsufficientBalance,
     }
 
     #[pallet::genesis_config]
@@ -129,7 +136,49 @@ pub mod pallet {
             Ok(())
         }
 
+        #[pallet::weight(0)]
+        pub fn sell(origin: OriginFor<T>, kitty_id: KittyIndex, price: Option<BalanceOf<T>>) -> DispatchResult {
+            let seller = ensure_signed(origin)?;
+            Self::set_price(&seller, kitty_id, &price)?;
 
+            Self::deposit_event(Event::SellKitty(seller, kitty_id, price));
+            Ok(())
+        }
+
+        #[pallet::weight(0)]
+        pub fn CancelSell(origin: OriginFor<T>, kitty_id: KittyIndex) -> DispatchResult {
+            let seller = ensure_signed(origin)?;
+            let price = None;
+            Self::set_price(&seller, kitty_id, &price)?;
+
+            Self::deposit_event(Event::CancelSellKitty(seller, kitty_id));
+            Ok(())
+        }
+
+        #[transactional]
+        #[pallet::weight(0)]
+        pub fn buy(origin: OriginFor<T>, kitty_id: KittyIndex, bid_price: BalanceOf<T>) -> DispatchResult {
+            let buyer = ensure_signed(origin)?;
+            let kitty = Self::kitties(kitty_id).ok_or(Error::<T>::KittyNotExist)?;
+            ensure!(buyer.clone() != kitty.owner, Error::<T>::CanNotBuyTheKittyYouOwned);
+
+            // ensure the bid_price is not lower than sell_price
+            if let Some(sell_price) = kitty.price {
+                ensure!(bid_price >= sell_price, Error::<T>::BidPriceIsTooLow);
+            } else {
+                Err(Error::<T>::TheKittyIsNotOnSell)?;
+            }
+
+            ensure!(T::Currency::free_balance(&buyer) >= bid_price, Error::<T>::InsufficientBalance);
+
+            let seller = kitty.owner.clone();
+            T::Currency::transfer(&buyer, &seller, bid_price, ExistenceRequirement::KeepAlive)?;
+            Self::transfer_kitty_to(kitty_id, &buyer)?;
+
+            Self::deposit_event(Event::BuyKitty(buyer, seller, kitty_id, bid_price));
+
+            Ok(())
+        }
 
     }
 
@@ -197,10 +246,10 @@ pub mod pallet {
                 vec.push(kitty_id)
             });
 
-
+            // when the kitty is transfered, the price should be set to None
+            kitty.price = None;    
             Kitties::<T>::insert(kitty_id, Some(kitty));
             Ok(())
-            
         }
 
         fn breed_kitty(owner: &T::AccountId, kitty_id_1: KittyIndex, kitty_id_2: KittyIndex) -> Result<KittyIndex, Error<T>> {
@@ -243,6 +292,14 @@ pub mod pallet {
             });
             KittiesCount::<T>::put(kitty_id + 1);
             Ok(kitty_id)
+        }
+
+        fn set_price(acct: &T::AccountId, kitty_id: KittyIndex, price: &Option<BalanceOf<T>>) -> Result<(), Error<T>> {
+            let mut kitty = Self::kitties(kitty_id).ok_or(Error::<T>::KittyNotExist)?;
+            ensure!(acct.clone() == Self::kitties(kitty_id).unwrap().owner, Error::<T>::NotOwner);
+            kitty.price = *price;
+            Kitties::<T>::insert(kitty_id, Some(kitty));
+            Ok(())
         }
     }
 }
