@@ -274,12 +274,14 @@ impl pallet_sudo::Config for Runtime {
 
 parameter_types! {
 	pub const MaxLengthOfHash: u32 = 20;
+	pub const MinLengthOfHash: u32 = 2;
 }
 
 /// Configure the pallet-template in pallets/template.
 impl pallet_poe::Config for Runtime {
 	type Event = Event;
 	type MaxLengthOfHash = MaxLengthOfHash;
+	type MinLengthOfHash = MinLengthOfHash;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.

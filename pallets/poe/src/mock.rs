@@ -26,6 +26,7 @@ parameter_types! {
 	pub const BlockHashCount: u64 = 250;
 	pub const SS58Prefix: u8 = 42;
 	pub const MaxLengthOfHash: u32 = 20;
+	pub const MinLengthOfHash: u32 = 2;
 }
 
 impl system::Config for Test {
@@ -57,6 +58,7 @@ impl system::Config for Test {
 impl pallet_poe::Config for Test {
 	type Event = Event;
 	type MaxLengthOfHash = MaxLengthOfHash;
+	type MinLengthOfHash = MinLengthOfHash;
 }
 
 // Build genesis storage according to the mock runtime.

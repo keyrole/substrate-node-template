@@ -21,6 +21,8 @@ pub mod pallet {
 
 		#[pallet::constant]
 		type MaxLengthOfHash: Get<u32>;
+		#[pallet::constant]
+		type MinLengthOfHash: Get<u32>;
 	}
 
 	#[pallet::event]
@@ -42,6 +44,8 @@ pub mod pallet {
 		NotProofOwner,
 		// The hash is too long to create claim
 		ProofHashIsTooLong,
+		// The hash is too short to create claim
+		ProofHashIsTooShort,
 	}
 
 	#[pallet::pallet]
@@ -65,6 +69,7 @@ pub mod pallet {
 
 			// Verify the lenth of hash don't exceed MaxLength
 			ensure!(proof.len() <= T::MaxLengthOfHash::get() as usize, Error::<T>::ProofHashIsTooLong);
+			ensure!(proof.len() >= T::MinLengthOfHash::get() as usize, Error::<T>::ProofHashIsTooShort);
 
 			// Verify that the specified proof has not already been claimed.
 			ensure!(!Proofs::<T>::contains_key(&proof), Error::<T>::ProofAlreadyClaimed);
