@@ -11,7 +11,7 @@ mod tests;
 #[frame_support::pallet]
 pub mod pallet {
     use frame_support::{dispatch::DispatchResult, pallet_prelude::*};
-    use frame_support::{traits::{Randomness, Currency, tokens::ExistenceRequirement}, transactional};
+    use frame_support::{traits::{Randomness, Currency, ReservableCurrency, tokens::ExistenceRequirement}, transactional};
     use frame_system::pallet_prelude::*;
     use codec::{Encode, Decode};
     use frame_support::sp_io::hashing::blake2_128;
@@ -34,7 +34,9 @@ pub mod pallet {
     pub trait Config: frame_system::Config {
         type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
         type Randomness: Randomness<Self::Hash, Self::BlockNumber>;
-        type Currency: Currency<Self::AccountId>;
+        type Currency: Currency<Self::AccountId> + ReservableCurrency<Self::AccountId>;
+        #[pallet::constant]
+		type MintKittyBondMinimum: Get<BalanceOf<Self>>;
     }
 
     #[pallet::pallet]
@@ -76,6 +78,7 @@ pub mod pallet {
         TheKittyIsNotOnSell,
         BidPriceIsTooLow,
         InsufficientBalance,
+        InsufficientBalanceForMintKitty,
     }
 
     #[pallet::genesis_config]
@@ -203,6 +206,9 @@ pub mod pallet {
                 }
             };
 
+			T::Currency::reserve(&acct, T::MintKittyBondMinimum::get())
+				.map_err(|_| Error::<T>::InsufficientBalanceForMintKitty)?;
+
             if let None = dna {
                 dna = Some(Self::random_value(&acct));
             };
@@ -285,6 +291,9 @@ pub mod pallet {
                 owner: owner.clone(),
                 price: None,
             };
+
+			T::Currency::reserve(&owner, T::MintKittyBondMinimum::get())
+				.map_err(|_| Error::<T>::InsufficientBalanceForMintKitty)?;
 
             Kitties::<T>::insert(kitty_id, Some(new_kitty));
             KittiesOwned::<T>::mutate(owner.clone(), |vec|{

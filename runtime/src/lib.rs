@@ -273,9 +273,14 @@ impl pallet_template::Config for Runtime {
 	type Event = Event;
 }
 
+parameter_types! {
+	pub const MintKittyBondMinimum: Balance = 2;
+}
+
 impl pallet_kitties::Config for Runtime {
 	type Event = Event;
 	type Randomness = RandomnessCollectiveFlip;
+	type MintKittyBondMinimum = MintKittyBondMinimum;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.

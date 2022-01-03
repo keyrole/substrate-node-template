@@ -6,12 +6,31 @@ fn create_should_work() {
     new_test_ext().execute_with(|| {
         assert_eq!(SubstrateKitties::kitties_count(), Some(2));
         assert_eq!(SubstrateKitties::kitty_owned(1).len(), 1);
+        let balance = Balances::free_balance(1);
         assert_ok!(SubstrateKitties::create(Origin::signed(1)));
         assert_eq!(SubstrateKitties::kitties(2).unwrap().owner, 1);
         assert_eq!(SubstrateKitties::kitties_count(), Some(3));
         assert_eq!(SubstrateKitties::kitty_owned(1).len(), 2);
+        assert_eq!(Balances::free_balance(1), balance - MintKittyBondMinimum::get());
 	});
 }
+
+#[test]
+fn create_failed_because_insuficient_balance_for_mint_kitty() {
+    new_test_ext().execute_with(|| {
+        assert_eq!(SubstrateKitties::kitties_count(), Some(2));
+        assert_eq!(SubstrateKitties::kitty_owned(3).len(), 0);
+        let balance = Balances::free_balance(3);
+        assert_noop!(
+            SubstrateKitties::create(Origin::signed(3)),
+            Error::<Test>::InsufficientBalanceForMintKitty
+        );
+        assert_eq!(SubstrateKitties::kitties_count(), Some(2));
+        assert_eq!(SubstrateKitties::kitty_owned(3).len(), 0);
+        assert_eq!(Balances::free_balance(3), balance);
+	});
+}
+
 
 #[test]
 fn tranfer_should_work() {
@@ -46,10 +65,12 @@ fn breed_should_work() {
     new_test_ext().execute_with(||{
         assert_ok!(SubstrateKitties::transfer(Origin::signed(2), 1, 1));
         assert_eq!(SubstrateKitties::kitty_owned(1), [0, 1]);
+        let balance = Balances::free_balance(1);
         assert_ok!(SubstrateKitties::breed(Origin::signed(1), 0, 1));
         assert_eq!(SubstrateKitties::kitty_owned(1), [0, 1, 2]);
         assert_eq!(SubstrateKitties::kitties_count(), Some(3));
         assert_eq!(SubstrateKitties::kitties(2).unwrap().owner, 1);
+        assert_eq!(Balances::free_balance(1), balance - MintKittyBondMinimum::get());
     });
 }
 
@@ -74,6 +95,24 @@ fn breed_failed_because_invalid_kitty_index() {
             SubstrateKitties::breed(Origin::signed(1), 10, 0),
             Error::<Test>::InvalidKittyIndex
         );
+    });
+}
+
+#[test]
+fn breed_failed_because_insufficient_balance_for_mint_kitty() {
+    new_test_ext().execute_with(||{
+        assert_ok!(SubstrateKitties::transfer(Origin::signed(1), 3, 0));
+        assert_ok!(SubstrateKitties::transfer(Origin::signed(2), 3, 1));
+        assert_eq!(SubstrateKitties::kitty_owned(3), [0, 1]);
+        let balance = Balances::free_balance(3);
+        let kittiescount = SubstrateKitties::kitties_count();
+        assert_noop!(
+            SubstrateKitties::breed(Origin::signed(3), 0, 1),
+            Error::<Test>::InsufficientBalanceForMintKitty
+        );
+        assert_eq!(SubstrateKitties::kitty_owned(3), [0, 1]);
+        assert_eq!(SubstrateKitties::kitties_count(), kittiescount);
+        assert_eq!(Balances::free_balance(3), balance);
     });
 }
 
@@ -135,16 +174,19 @@ fn cancel_sell_kitty_should_work() {
 #[test]
 fn buy_kitty_should_work() {
     new_test_ext().execute_with(||{
+        let balance1 = Balances::free_balance(1);
+        let balance2 = Balances::free_balance(2);
         assert_eq!(SubstrateKitties::kitties(0).unwrap().price, None);
         assert_ok!(SubstrateKitties::sell(Origin::signed(1), 0, Some(5)));
         assert_eq!(SubstrateKitties::kitties(0).unwrap().price, Some(5));
-        assert_ok!(SubstrateKitties::buy(Origin::signed(2), 0, 6));
+        let price: Balance = 6;
+        assert_ok!(SubstrateKitties::buy(Origin::signed(2), 0, price));
         assert_eq!(SubstrateKitties::kitty_owned(1).len(), 0);
         assert_eq!(SubstrateKitties::kitty_owned(2).len(), 2);
         assert_eq!(SubstrateKitties::kitty_owned(2), [1, 0]);
         assert_eq!(SubstrateKitties::kitties(0).unwrap().owner, 2);
-        assert_eq!(Balances::free_balance(1), 1_000_000 + 6);
-        assert_eq!(Balances::free_balance(2), 10 - 6);
+        assert_eq!(Balances::free_balance(1), balance1 + price);
+        assert_eq!(Balances::free_balance(2), balance2 - price);
 
     });
 }
@@ -182,6 +224,8 @@ fn can_not_buy_kitty_because_the_kitty_is_not_on_sell() {
 #[test]
 fn buy_kitty_failed_because_bit_price_is_too_low() {
     new_test_ext().execute_with(||{
+        let balance1 = Balances::free_balance(1);
+        let balance2 = Balances::free_balance(2);
         assert_eq!(SubstrateKitties::kitties(0).unwrap().price, None);
         assert_ok!(SubstrateKitties::sell(Origin::signed(1), 0, Some(5)));
         assert_eq!(SubstrateKitties::kitties(0).unwrap().price, Some(5));
@@ -192,14 +236,16 @@ fn buy_kitty_failed_because_bit_price_is_too_low() {
         assert_eq!(SubstrateKitties::kitty_owned(1).len(), 1);
         assert_eq!(SubstrateKitties::kitty_owned(2).len(), 1);
         assert_eq!(SubstrateKitties::kitties(0).unwrap().owner, 1);
-        assert_eq!(Balances::free_balance(1), 1_000_000);
-        assert_eq!(Balances::free_balance(2), 10);
+        assert_eq!(Balances::free_balance(1), balance1);
+        assert_eq!(Balances::free_balance(2), balance2);
     });
 }
 
 #[test]
 fn buy_kitty_failed_because_balance_of_buyer_is_insufficient() {
     new_test_ext().execute_with(||{
+        let balance1 = Balances::free_balance(1);
+        let balance2 = Balances::free_balance(2);
         assert_eq!(SubstrateKitties::kitties(0).unwrap().price, None);
         assert_ok!(SubstrateKitties::sell(Origin::signed(1), 0, Some(50)));
         assert_eq!(SubstrateKitties::kitties(0).unwrap().price, Some(50));
@@ -210,8 +256,8 @@ fn buy_kitty_failed_because_balance_of_buyer_is_insufficient() {
         assert_eq!(SubstrateKitties::kitty_owned(1).len(), 1);
         assert_eq!(SubstrateKitties::kitty_owned(2).len(), 1);
         assert_eq!(SubstrateKitties::kitties(0).unwrap().owner, 1);
-        assert_eq!(Balances::free_balance(1), 1_000_000);
-        assert_eq!(Balances::free_balance(2), 10);
+        assert_eq!(Balances::free_balance(1), balance1);
+        assert_eq!(Balances::free_balance(2), balance2);
     });
 }
 // fn tmp() {

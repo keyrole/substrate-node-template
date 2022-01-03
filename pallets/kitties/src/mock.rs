@@ -9,6 +9,7 @@ use frame_system as system;
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;
+pub type Balance = u64;
 
 // Configure a mock runtime to test the pallet.
 frame_support::construct_runtime!(
@@ -79,10 +80,15 @@ impl system::Config for Test {
 	type Version = ();
 }
 
+parameter_types! {
+	pub const MintKittyBondMinimum: Balance = 2;
+}
+
 impl pallet_kitties::Config for Test {
 	type Event = Event;
     type Randomness = RandomnessCollectiveFlip;
 	type Currency = Balances;
+	type MintKittyBondMinimum = MintKittyBondMinimum;
 
 }
 
@@ -90,6 +96,7 @@ impl pallet_randomness_collective_flip::Config for Test {}
 
 parameter_types!{
 	pub const ExistentialDeposit: u64 = 1;
+	// pub const MintKittyBondMinimum: Balance = 2;
 }
 
 impl pallet_balances::Config for Test {
@@ -110,7 +117,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 	let mut t = system::GenesisConfig::default().build_storage::<Test>().unwrap();
 	GenesisConfig {
 		balances: BalancesConfig {
-			balances: vec![(1, 1_000_000), (2, 10)]
+			balances: vec![(1, 1_000_000), (2, 10), (3, 1)]
 		},
 		substrate_kitties: SubstrateKittiesConfig {
 			kitties: vec![
