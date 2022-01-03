@@ -5,7 +5,7 @@
 2.KittyIndex不在pallet中指定，而是在runtime中绑定
 
 3.测试代码运行结果
-![avatar](https://github.com/keyrole/substrate-node-template/blob/mykitties/pallets/kitties/Snapshots/20220102-205148.png)
+![avatar](https://github.com/keyrole/substrate-node-template/blob/mykitties/pallets/kitties/Snapshots/20220103-205745.png)
 
 4.引入Balances里面的方法，质押一定的token
-
+已完成，见代码
