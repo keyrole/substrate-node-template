@@ -1,6 +1,14 @@
 use crate::{Error, mock::*};
 use frame_support::{assert_ok, assert_noop};
 
+fn events() -> Vec<Event> {
+    let evt = System::events().into_iter().map(|evt| evt.event).collect::<Vec<_>>();
+
+    System::reset_events();
+
+    evt
+}
+
 #[test]
 fn create_should_work() {
     new_test_ext().execute_with(|| {
@@ -12,6 +20,12 @@ fn create_should_work() {
         assert_eq!(SubstrateKitties::kitties_count(), Some(3));
         assert_eq!(SubstrateKitties::kitty_owned(1).len(), 2);
         assert_eq!(Balances::free_balance(1), balance - MintKittyBondMinimum::get());
+
+        // assert_eq!(
+        //     events(),
+        //     [Event::Balances(crate::Event::Reserved(1, 2)),
+        //     Event::SubstrateKitties(crate::Event::KittyCreate(1, 2))]
+        // );
 	});
 }
 
@@ -43,6 +57,10 @@ fn tranfer_should_work() {
         assert_eq!(SubstrateKitties::kitty_owned(2).len(), 2);
         assert_eq!(SubstrateKitties::kitty_owned(2), [1, 0]);
         assert_eq!(SubstrateKitties::kitties(0).unwrap().owner, 2);
+        assert_eq!(
+            events(),
+            [Event::SubstrateKitties(crate::Event::KittyTransfer(1, 2, 0))]
+        );
     });
 }
 
@@ -71,6 +89,11 @@ fn breed_should_work() {
         assert_eq!(SubstrateKitties::kitties_count(), Some(3));
         assert_eq!(SubstrateKitties::kitties(2).unwrap().owner, 1);
         assert_eq!(Balances::free_balance(1), balance - MintKittyBondMinimum::get());
+        // assert_eq!(
+        //     events(),
+        //     [Event::Balances(crate::Event::Reserved(1, 2)),
+        //     Event::SubstrateKitties(crate::Event::KittyCreate(1, 2))]
+        // );
     });
 }
 
@@ -136,7 +159,12 @@ fn sell_kitty_should_work() {
         assert_eq!(SubstrateKitties::kitties(0).unwrap().price, None);
         assert_ok!(SubstrateKitties::sell(Origin::signed(1), 0, Some(5)));
         assert_eq!(SubstrateKitties::kitties(0).unwrap().price, Some(5));
+        assert_eq!(
+            events(),
+            [Event::SubstrateKitties(crate::Event::SellKitty(1, 0, Some(5)))]
+        );
     });
+
 }
 
 #[test]
@@ -167,7 +195,13 @@ fn cancel_sell_kitty_should_work() {
         assert_eq!(SubstrateKitties::kitties(0).unwrap().price, Some(5));
         assert_ok!(SubstrateKitties::CancelSell(Origin::signed(1), 0));
         assert_eq!(SubstrateKitties::kitties(0).unwrap().price, None);
+        assert_eq!(
+            events(),
+            [Event::SubstrateKitties(crate::Event::SellKitty(1, 0, Some(5))),
+            Event::SubstrateKitties(crate::Event::CancelSellKitty(1, 0))]
+        );
     });
+
 }
 
 
@@ -187,7 +221,12 @@ fn buy_kitty_should_work() {
         assert_eq!(SubstrateKitties::kitties(0).unwrap().owner, 2);
         assert_eq!(Balances::free_balance(1), balance1 + price);
         assert_eq!(Balances::free_balance(2), balance2 - price);
-
+        // assert_eq!(
+        //     events(),
+        //     [Event::SubstrateKitties(crate::Event::SellKitty(1, 0, Some(5))),
+        //     Event::Balances(crate::Event::Transfer(2, 1, 6)),
+        //     Event::SubstrateKitties(crate::Event::BuyKitty(2, 1, 0, price))]
+        // );
     });
 }
 
@@ -260,27 +299,3 @@ fn buy_kitty_failed_because_balance_of_buyer_is_insufficient() {
         assert_eq!(Balances::free_balance(2), balance2);
     });
 }
-// fn tmp() {
-//     new_test_ext().execute_with(||{
-
-//     });
-// }
-
-// fn tmp() {
-//     new_test_ext().execute_with(||{
-
-//     });
-// }
-
-
-// fn tmp() {
-//     new_test_ext().execute_with(||{
-
-//     });
-// }
-
-// fn tmp() {
-//     new_test_ext().execute_with(||{
-
-//     });
-// }
